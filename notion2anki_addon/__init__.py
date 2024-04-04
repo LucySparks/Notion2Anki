@@ -2,12 +2,12 @@
 
 import json
 import zipfile
+from collections import defaultdict
 from pathlib import Path
 from shutil import rmtree
 from tempfile import TemporaryDirectory
 from traceback import format_exc
 from typing import Any, Dict, List, Optional, Set, cast
-from collections import defaultdict
 
 from anki.collection import Collection
 from aqt import mw
