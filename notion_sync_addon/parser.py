@@ -1,4 +1,5 @@
 """Parser to extract Anki note data from HTML."""
+
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
