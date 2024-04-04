@@ -8,6 +8,9 @@ An [Anki](https://apps.ankiweb.net/) addon that loads toggle lists from [Notion]
 This project is forked from [notion-anki-sync](https://github.com/9dogs/notion-anki-sync). I've made enhancements to the original project and added the following features:
 + Adding Notes from Different Pages to **Different Anki Decks**
 
+Here are two screenshots demonstrating the rendering of code blocks and formula blocks from Notion, as well as the rendering of bold text style and background color.
+![we](image_formula.png)
+![alt text](image_code.png)
 
 ## How it works
 The general process involves initially exporting the page content as HTML, followed by converting the HTML into Flask cards for importing into their respective decks. Specifically:
@@ -67,7 +70,7 @@ Edit plugin config file from Anki: `Tools ➡ Add-ons ➡ Notion Toggles Loader 
 - `notion_token`: `str [default: None]` — Notion APIv2 token.
 - `notion_namespace`: `str [default: None]` — Notion namespace (your username) to form source URLs.
 - `notion_pages`: `array [default: [] ]` — List of Notion pages to export notes from.
-  -  `page_id`: 32 chars of Notion page id.,
+  - `page_id`: 32 chars of Notion page id.,
   - `recursive`: If true, Page should be exported with all its subpages.,
   - `target_deck`: The target deck is a string attribute that specifies the name of the deck where loaded notes will be added. If multiple page_ids refer to the same target_deck, their corresponding notes will be combined and added to the same target_deck.
 
@@ -81,3 +84,5 @@ Notion API is used, the addon may break without a warning.
 
 - Some toggle blocks are empty on export which leads to empty Anki notes. The issue is on the Notion side (and they're
   aware of it).
+
+- The color of the code block cannot be rendered.
