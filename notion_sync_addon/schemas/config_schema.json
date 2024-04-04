@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "https://github.com/9dogs/notion-anki-sync/tree/main/notion_sync_addon/schemas/config_schema.json",
+  "$id": "https://github.com/BaiRuic/Notion2Anki/blob/main/notion_sync_addon/schemas/config_schema.json",
   "type": "object",
-  "title": "notion-anki-sync config schema",
-  "description": "JSON schema for configuration of notion-anki-sync add-on.",
+  "title": "Notion2Anki config schema",
+  "description": "JSON schema for configuration of Notion2Anki add-on.",
   "default": {},
   "definitions": {
     "page_spec": {
@@ -26,6 +26,15 @@
           "examples": [
             false
           ]
+        },
+        "target_deck": {
+          "type": "string",
+          "title": "Target deck",
+          "description": "The target deck is a string attribute that specifies the name of the deck where loaded notes will be added. If multiple page_ids refer to the same target_deck, their corresponding notes will be combined and added to the same target_deck.",
+          "default": "",
+          "examples": [
+            "math"
+          ]
         }
       }
     }
@@ -34,24 +43,24 @@
     {
       "debug": false,
       "sync_every_minutes": 30,
-      "anki_target_deck": "Notion Sync",
       "notion_token": "<your_notion_token_here>",
       "notion_namespace": "<your_notion_username_here",
       "notion_pages": [
         {
           "page_id": "<page_id1>",
-          "recursive": false
+          "recursive": false,
+          "target_deck": "<deck_1>"
         },
         {
           "page_id": "<page_id2>",
-          "recursive": true
+          "recursive": true,
+          "target_deck": "<deck_1>"
         }
       ]
     }
   ],
   "required": [
     "sync_every_minutes",
-    "anki_target_deck",
     "notion_token",
     "notion_namespace",
     "notion_pages"
@@ -75,16 +84,6 @@
       "default": 30,
       "examples": [
         30
-      ]
-    },
-    "anki_target_deck": {
-      "$id": "#/properties/anki_target_deck",
-      "type": "string",
-      "title": "Anki target deck",
-      "description": "The deck loaded notes will be added to.",
-      "default": "Notion Sync",
-      "examples": [
-        "Notion Sync"
       ]
     },
     "notion_token": {
@@ -117,11 +116,13 @@
         [
           {
             "page_id": "<page_id1>",
-            "recursive": false
+            "recursive": false,
+            "target_deck": "<deck_1>"
           },
           {
             "page_id": "<page_id2>",
-            "recursive": true
+            "recursive": true,
+            "target_deck": "<deck_1>"
           }
         ]
       ],

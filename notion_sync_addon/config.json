@@ -1,13 +1,13 @@
 {
   "debug": false,
   "sync_every_minutes": 30,
-  "anki_target_deck": "Notion Sync",
   "notion_token": "",
   "notion_namespace": "",
   "notion_pages": [
     {
       "page_id": "ID",
-      "recursive": true
+      "recursive": true,
+      "target_deck": "math"
     }
   ]
 }
