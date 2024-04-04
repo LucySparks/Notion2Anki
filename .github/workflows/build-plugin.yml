@@ -16,12 +16,12 @@ jobs:
     - name: Build plugin
       uses: thedoctor0/zip-release@master
       with:
-        filename: notion-sync-${{ env.RELEASE_VERSION }}.ankiaddon
-        directory: notion_sync_addon
+        filename: Notion2Anki-${{ env.RELEASE_VERSION }}.ankiaddon
+        directory: notion2anki_addon
         exclusions: '*pycache*'
     - name: Upload plugin
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
-        artifacts: notion_sync_addon/notion-sync-${{ env.RELEASE_VERSION }}.ankiaddon
+        artifacts: notion2anki_addon/Notion2Anki-${{ env.RELEASE_VERSION }}.ankiaddon
         token: ${{ secrets.GITHUB_TOKEN }}

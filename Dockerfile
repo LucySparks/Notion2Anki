@@ -22,4 +22,4 @@ WORKDIR /opt/notion-sync-addon
 RUN poetry install --no-interaction --no-ansi $poetry_args
 
 COPY . .
-ENV PYTHONPATH "${PYTHONPATH}:/opt/notion-sync-addon"
+ENV PYTHONPATH "${PYTHONPATH}:/opt/notion2anki_addon"

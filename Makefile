@@ -6,7 +6,7 @@ all:
 	@echo "fmt                 Format code."
 	@echo "lint                Lint code."
 
-FILES = notion_sync_addon tests
+FILES = notion2anki_addon tests
 
 fmt:
 	poetry run black $(FILES)
