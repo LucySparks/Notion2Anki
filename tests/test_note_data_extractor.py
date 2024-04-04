@@ -1,7 +1,8 @@
 """Tests for note data extractor."""
+
 from pathlib import Path
 
-from notion_sync_addon.parser import NoteDataExtractor
+from notion2anki_addon.parser import NoteDataExtractor
 
 #: Base directory
 BASE_DIR = Path(__file__).parent

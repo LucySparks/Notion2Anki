@@ -7,6 +7,7 @@ from shutil import rmtree
 from tempfile import TemporaryDirectory
 from traceback import format_exc
 from typing import Any, Dict, List, Optional, Set, cast
+from collections import defaultdict
 
 from anki.collection import Collection
 from aqt import mw
@@ -37,8 +38,6 @@ class NotionSyncPlugin(QObject):
     on timer.
     """
 
-    #: Default deck name
-    DEFAULT_DECK_NAME: str = 'Notion Sync'
     #: Default sync interval, min
     DEFAULT_SYNC_INTERVAL: int = 30
 
@@ -62,15 +61,18 @@ class NotionSyncPlugin(QObject):
         # Anki's collection and note manager
         self.collection: Optional[Collection] = None
         self._collection_seeded = False
-        self.notes_manager: Optional[NotesManager] = None
+        # The notes managers for each deck
+        self.notes_managers: Optional[Dict[str, List[NotesManager]]] = None
         # Workers scaffolding
         self.thread_pool = QThreadPool()
-        self.synced_note_ids: Set[int] = set()
+        # The notes ids that were synced for each deck
+        self.synced_note_ids: Dict[str, Set[int]] = defaultdict(set)
         self._alive_workers: int = 0
         self._sync_errors: List[str] = []
         # Sync stats
         self._processed = self._created = self._updated = self._deleted = 0
-        self.existing_note_ids: Set[int] = set()
+        # The notes ids that were already in the collection for each deck
+        self.existing_note_ids: Dict[str, Set[int]] = defaultdict(set)
         self._remove_obsolete_on_sync = False
         # Add action to Anki menu
         self.notion_menu: Optional[QMenu] = None
@@ -147,7 +149,7 @@ class NotionSyncPlugin(QObject):
     def add_actions(self):
         """Add Notion menu entry with actions to Tools menu."""
         assert mw  # mypy
-        self.notion_menu = mw.form.menuTools.addMenu('Notion')
+        self.notion_menu = mw.form.menuTools.addMenu('NotionSync')
         load_action = QAction('Load notes', mw)
         load_action_and_remove_obsolete = QAction(
             'Load notes and remove obsolete', mw
@@ -167,23 +169,36 @@ class NotionSyncPlugin(QObject):
         if not self.collection:
             self.logger.error('Collection is empty')
             return
-        self.notes_manager = NotesManager(
-            collection=self.collection,
-            deck_name=self.config.get(
-                'anki_target_deck', self.DEFAULT_DECK_NAME
-            ),
-            debug=self.debug,
-        )
+        # Create notes managers
+        self.logger.info("Creating notes managers...")
+        self.notes_managers = {}
+        for page_conf in self.get_notion_pages_config():
+            page_id, target_deck, _ = page_conf
+
+            self.logger.info(
+                f"Creating notes manager for Notion page:{page_id} and deck:{target_deck}"
+            )
+
+            self.notes_managers[target_deck] = NotesManager(
+                collection=self.collection,
+                deck_name=target_deck,
+                debug=self.debug,
+            )
+
         self.logger.info('Collection initialized')
-        self.existing_note_ids = self.notes_manager.existing_note_ids
+        self.existing_note_ids = {
+            deck: nm.existing_note_ids
+            for deck, nm in self.notes_managers.items()
+        }
         self._collection_seeded = True
 
-    def handle_worker_result(self, notes: List[AnkiNote]) -> None:
+    def handle_worker_result(self, deck: str, notes: List[AnkiNote]) -> None:
         """Add notes to collection.
 
+        :param deck: deck name
         :param notes: notes
         """
-        assert self.notes_manager  # mypy
+        assert self.notes_managers and deck in self.notes_managers  # mypy
         try:
             for note in notes:
                 if not note.front:
@@ -193,35 +208,41 @@ class NotionSyncPlugin(QObject):
                     continue
                 self._processed += 1
                 # Find out if note already exists
-                note_id = self.notes_manager.find_note(note)
+                note_id = self.notes_managers[deck].find_note(note)
                 if note_id:
-                    is_updated = self.notes_manager.update_note(note_id, note)
+                    is_updated = self.notes_managers[deck].update_note(
+                        note_id, note
+                    )
                     if is_updated:
                         self._updated += 1
                 # Create new note
                 else:
-                    note_id = self.notes_manager.create_note(note)
+                    note_id = self.notes_managers[deck].create_note(note)
                     self._created += 1
-                self.synced_note_ids.add(note_id)
+                self.synced_note_ids[deck].add(note_id)
         except Exception:
             error_msg = format_exc()
             self._sync_errors.append(error_msg)
 
-    def handle_sync_finished(self) -> None:
+    def handle_sync_finished(self, deck: str) -> None:
         """Handle sync finished.
 
         In case of any error - show error message in manual mode and do nothing
         otherwise.  If no error - save the collection and show sync statistics
         in manual mode.  If `self._remove_obsolete_on_sync` is True - remove
         all notes that is not added or updated in current sync.
+
+        :param deck: deck name that finished sync (Only this deck is finished)
         """
-        assert self.notes_manager  # mypy
+        assert self.notes_managers  # mypy
         assert self.collection  # mypy
+        self.logger.info(f"Worker finished: {deck}")
         self._alive_workers -= 1
+        # If all workers finished, execute following code in this function, otherwise wait
         if self._alive_workers:
             return
         assert self.notion_menu  # mypy
-        self.notion_menu.setTitle('Notion')
+        self.notion_menu.setTitle('NotionSync')
         # Show errors if manual sync
         if self._sync_errors:
             if not self._is_auto_sync:
@@ -230,23 +251,38 @@ class NotionSyncPlugin(QObject):
         # If no errors - save collection and refresh Anki window
         else:
             if self._remove_obsolete_on_sync:
-                ids_to_remove = self.existing_note_ids - self.synced_note_ids
+                # Get the note id that should be removed per deck
+                ids_to_remove = defaultdict(set)
+                temp_total_removed = 0
+                for deck in self.existing_note_ids.keys():
+                    temp_ids = (
+                        self.existing_note_ids[deck]
+                        - self.synced_note_ids[deck]
+                    )
+                    if len(temp_ids) > 0:
+                        ids_to_remove[deck] = temp_ids
+                        self.logger.info(
+                            f"Will delete {len(temp_ids)} note(s) in {deck}"
+                        )
+                        temp_total_removed += len(ids_to_remove)
                 if ids_to_remove:
                     msg = (
-                        f'Will delete {len(ids_to_remove)} obsolete note(s), '
-                        f'continue?'
+                        f"Will delete {temp_total_removed} obsolete note(s), "
+                        f"continue?"
                     )
                     assert mw  # mypy
                     do_delete = QMessageBox.question(
                         mw,
-                        'Confirm deletion',
+                        "Confirm deletion",
                         msg,
                         QMessageBox.StandardButton.Yes
                         | QMessageBox.StandardButton.No,
                     )
                     if do_delete == QMessageBox.StandardButton.Yes.value:
-                        self.notes_manager.remove_notes(ids_to_remove)
-                        self._deleted += len(ids_to_remove)
+                        for deck, notes_id in ids_to_remove.items():
+                            self.notes_managers[deck].remove_notes(notes_id)
+                        self._deleted += len(notes_id)
+
             self.collection.save(trx=False)
             mw.maybeReset()  # type: ignore[union-attr]
             mw.deckBrowser.refresh()  # type: ignore[union-attr]
@@ -313,9 +349,12 @@ class NotionSyncPlugin(QObject):
         Saves pre-sync existing note ids and resets sync stats and errors.
         """
         self._remove_obsolete_on_sync = False
-        self.synced_note_ids.clear()
-        assert self.notes_manager  # mypy
-        self.existing_note_ids = self.notes_manager.existing_note_ids
+        self.synced_note_ids = defaultdict(set)
+        assert self.notes_managers  # mypy
+        self.existing_note_ids = {
+            deck: nm.existing_note_ids
+            for deck, nm in self.notes_managers.items()
+        }
         self._processed = self._created = self._updated = self._deleted = 0
         self._sync_errors = []
 
@@ -330,14 +369,13 @@ class NotionSyncPlugin(QObject):
                 return
         assert self.notion_menu  # mypy
         self.notion_menu.setTitle('Notion (syncing...)')
-        for page_spec in self.config.get('notion_pages', []):
-            page_id = page_spec['page_id']
-            recursive = page_spec.get('recursive', False)
-            page_id = normalize_block_id(page_id)
+        for page_conf in self.get_notion_pages_config():
+            page_id, target_deck, recursive = page_conf
             worker = NotesExtractorWorker(
                 notion_token=self.config['notion_token'],
                 page_id=page_id,
                 recursive=recursive,
+                target_deck=target_deck,
                 notion_namespace=self.config.get('notion_namespace', ''),
                 debug=self.debug,
             )
@@ -348,14 +386,32 @@ class NotionSyncPlugin(QObject):
             self.thread_pool.start(worker)
             self._alive_workers += 1
 
+    def get_notion_pages_config(self) -> List[List[str]]:
+        """Get Notion pages configuration. For page_spec without a specified target_deck value, the target_deck will default to using the page_id.
+
+        :returns: Notion pages configuration, including page_id, target_deck and recursive flag
+        """
+        pages_conf = []
+        for page_spec in self.config.get("notion_pages", []):
+            ori_page_id = page_spec["page_id"]
+            page_id = normalize_block_id(ori_page_id)
+            target_deck = page_spec.get("target_deck", None)
+            recursive = page_spec.get("recursive", False)
+            if target_deck == "" or target_deck is None:
+                target_deck = ori_page_id
+
+            pages_conf.append([page_id, target_deck, recursive])
+
+        return pages_conf
+
 
 class NoteExtractorSignals(QObject):
     """The signals available from a running extractor thread."""
 
     #: Extraction finished
-    finished = pyqtSignal()
+    finished = pyqtSignal(str)
     #: Notes data
-    result = pyqtSignal(object)
+    result = pyqtSignal(str, object)
     #: Error
     error = pyqtSignal(str)
 
@@ -368,6 +424,7 @@ class NotesExtractorWorker(QRunnable):
         notion_token: str,
         page_id: str,
         recursive: bool,
+        target_deck: str,
         notion_namespace: str,
         debug: bool = False,
     ):
@@ -386,6 +443,7 @@ class NotesExtractorWorker(QRunnable):
         self.notion_token = notion_token
         self.page_id = page_id
         self.recursive = recursive
+        self.target_deck = target_deck
         self.notion_namespace = notion_namespace
 
     def run(self) -> None:
@@ -395,6 +453,9 @@ class NotesExtractorWorker(QRunnable):
         results.
         """
         self.logger.info('Worker started')
+        self.logger.info(
+            f"Current page id: {self.page_id}. Current deck: {self.target_deck}"
+        )
         try:
             with TemporaryDirectory() as tmp_dir:
                 # Export given Notion page as HTML
@@ -419,7 +480,9 @@ class NotesExtractorWorker(QRunnable):
                         notion_namespace=self.notion_namespace,
                         debug=self.debug,
                     )
-                self.logger.info('Notes extracted: count=%s', len(notes))
+                self.logger.info(
+                    f"Notes extracted: deck:{self.target_deck}, count:{len(notes)}"
+                )
         except NotionClientError as exc:
             self.logger.error('Error extracting notes', exc_info=exc)
             error_msg = f'Cannot export {self.page_id}:\n{exc}'
@@ -429,9 +492,9 @@ class NotesExtractorWorker(QRunnable):
             # Delete manually
             rmtree(tmp_path, ignore_errors=True)
         else:
-            self.signals.result.emit(notes)
+            self.signals.result.emit(self.target_deck, notes)
         finally:
-            self.signals.finished.emit()
+            self.signals.finished.emit(self.target_deck)
 
 
 NotionSyncPlugin()
