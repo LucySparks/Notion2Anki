@@ -1,6 +1,5 @@
 FROM python:3.9.13-bullseye
 
-LABEL maintainer="Mikhail.Knyazev@phystech.edu"
 LABEL description="Sync Notion toggle lists to Anki cards."
 
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -17,8 +16,8 @@ RUN pip install poetry \
     && poetry config virtualenvs.in-project true
 
 # Install project dependencies
-COPY poetry.lock pyproject.toml /opt/notion-sync-addon/
-WORKDIR /opt/notion-sync-addon
+COPY poetry.lock pyproject.toml /opt/notion2anki_addon/
+WORKDIR /opt/notion2anki_addon
 RUN poetry install --no-interaction --no-ansi $poetry_args
 
 COPY . .
