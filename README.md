@@ -26,6 +26,7 @@ The general process involves initially exporting the page content as HTML, follo
 section. Note that background sync **does not remove** any notes; if you want to remove the obsolete notes, then
 trigger `Load and remove obsolete` from the submenu.
 
+This add-on has been added to [AnkiWeb](https://ankiweb.net/). For instructions on how to use it, please visit [Notion2Anki](https://ankiweb.net/shared/info/644963660).
 ## Requirements
 
 ### Notion API token
