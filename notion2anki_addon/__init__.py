@@ -53,11 +53,11 @@ class NotionSyncPlugin(QObject):
         # Validate config
         self.config = self.get_valid_config(config)
         # Create a logger
-        self.debug = 'debug' in self.config and self.config['debug']
+        self.debug = "debug" in self.config and self.config["debug"]
         if self.debug:
             enable_logging_to_file()
         self.logger = get_logger(self.__class__.__name__, self.debug)
-        self.logger.info('Config loaded: %s', self.config)
+        self.logger.info("Config loaded: %s", self.config)
         # Anki's collection and note manager
         self.collection: Optional[Collection] = None
         self._collection_seeded = False
@@ -85,7 +85,7 @@ class NotionSyncPlugin(QObject):
         self._is_auto_sync = True
         self.timer = QTimer()
         sync_interval_milliseconds = (
-            self.config.get('sync_every_minutes', self.DEFAULT_SYNC_INTERVAL)
+            self.config.get("sync_every_minutes", self.DEFAULT_SYNC_INTERVAL)
             * 60  # seconds
             * 1000  # milliseconds
         )
@@ -101,10 +101,10 @@ class NotionSyncPlugin(QObject):
         :raises ValidationError: if config is invalid
         """
         if not config:
-            raise ValidationError('Config is empty')
+            raise ValidationError("Config is empty")
         # Load schema and validate configuration
         with open(
-            BASE_DIR / 'schemas/config_schema.json', encoding='utf8'
+            BASE_DIR / "schemas/config_schema.json", encoding="utf8"
         ) as s:
             schema = json.load(s)
         validate(config, schema)
@@ -121,7 +121,7 @@ class NotionSyncPlugin(QObject):
         try:
             self._validate_config(config)
         except ValidationError as exc:
-            showCritical(str(exc), title='Notion loader config load error')
+            showCritical(str(exc), title="Notion loader config load error")
             assert mw  # mypy
             default_config = mw.addonManager.addonConfigDefaults(str(BASE_DIR))
             return cast(Dict[str, Any], default_config)
@@ -140,8 +140,8 @@ class NotionSyncPlugin(QObject):
         try:
             self._validate_config(new_config)
         except ValidationError as exc:
-            self.logger.error('Config update error', exc_info=exc)
-            showCritical(str(exc), title='Notion loader config update error')
+            self.logger.error("Config update error", exc_info=exc)
+            showCritical(str(exc), title="Notion loader config update error")
         else:
             assert new_config  # mypy
             self.config = new_config
@@ -149,10 +149,10 @@ class NotionSyncPlugin(QObject):
     def add_actions(self):
         """Add Notion menu entry with actions to Tools menu."""
         assert mw  # mypy
-        self.notion_menu = mw.form.menuTools.addMenu('NotionSync')
-        load_action = QAction('Load notes', mw)
+        self.notion_menu = mw.form.menuTools.addMenu("NotionSync")
+        load_action = QAction("Load notes", mw)
         load_action_and_remove_obsolete = QAction(
-            'Load notes and remove obsolete', mw
+            "Load notes and remove obsolete", mw
         )
         load_action.triggered.connect(self.sync)
         load_action_and_remove_obsolete.triggered.connect(
@@ -167,7 +167,7 @@ class NotionSyncPlugin(QObject):
         assert mw  # mypy
         self.collection = mw.col
         if not self.collection:
-            self.logger.error('Collection is empty')
+            self.logger.error("Collection is empty")
             return
         # Create notes managers
         self.logger.info("Creating notes managers...")
@@ -185,7 +185,7 @@ class NotionSyncPlugin(QObject):
                 debug=self.debug,
             )
 
-        self.logger.info('Collection initialized')
+        self.logger.info("Collection initialized")
         self.existing_note_ids = {
             deck: nm.existing_note_ids
             for deck, nm in self.notes_managers.items()
@@ -203,7 +203,7 @@ class NotionSyncPlugin(QObject):
             for note in notes:
                 if not note.front:
                     self.logger.warning(
-                        'Note front is empty. Back: %s', safe_str(note.back)
+                        "Note front is empty. Back: %s", safe_str(note.back)
                     )
                     continue
                 self._processed += 1
@@ -242,12 +242,12 @@ class NotionSyncPlugin(QObject):
         if self._alive_workers:
             return
         assert self.notion_menu  # mypy
-        self.notion_menu.setTitle('NotionSync')
+        self.notion_menu.setTitle("NotionSync")
         # Show errors if manual sync
         if self._sync_errors:
             if not self._is_auto_sync:
-                error_msg = '\n'.join(self._sync_errors)
-                showCritical(error_msg, title='Loading from Notion failed')
+                error_msg = "\n".join(self._sync_errors)
+                showCritical(error_msg, title="Loading from Notion failed")
         # If no errors - save collection and refresh Anki window
         else:
             if self._remove_obsolete_on_sync:
@@ -287,18 +287,18 @@ class NotionSyncPlugin(QObject):
             mw.maybeReset()  # type: ignore[union-attr]
             mw.deckBrowser.refresh()  # type: ignore[union-attr]
             stats = (
-                f'Processed: {self._processed}\n'
-                f'Created: {self._created}\n'
-                f'Updated: {self._updated}\n'
-                f'Deleted: {self._deleted}'
+                f"Processed: {self._processed}\n"
+                f"Created: {self._created}\n"
+                f"Updated: {self._updated}\n"
+                f"Deleted: {self._deleted}"
             )
             if not self._is_auto_sync:
                 showInfo(
-                    f'Successfully loaded:\n{stats}',
-                    title='Loading from Notion',
+                    f"Successfully loaded:\n{stats}",
+                    title="Loading from Notion",
                 )
         self.logger.info(
-            'Sync finished, processed=%s, created=%s, updated=%s, deleted=%s',
+            "Sync finished, processed=%s, created=%s, updated=%s, deleted=%s",
             self._processed,
             self._created,
             self._updated,
@@ -315,7 +315,7 @@ class NotionSyncPlugin(QObject):
 
     def auto_sync(self) -> None:
         """Perform synchronization in background."""
-        self.logger.info('Auto sync started')
+        self.logger.info("Auto sync started")
         # Reload config
         assert mw  # mypy
         self.reload_config(None)
@@ -324,7 +324,7 @@ class NotionSyncPlugin(QObject):
 
     def sync(self) -> None:
         """Perform synchronization and report result."""
-        self.logger.info('Sync started')
+        self.logger.info("Sync started")
         # Reload config
         assert mw  # mypy
         self.reload_config(None)
@@ -333,13 +333,13 @@ class NotionSyncPlugin(QObject):
             self._sync()
         else:
             showInfo(
-                'Sync is already in progress, please wait',
-                title='Load from Notion',
+                "Sync is already in progress, please wait",
+                title="Load from Notion",
             )
 
     def sync_and_remove_obsolete(self) -> None:
         """Perform synchronization and remove obsolete notes."""
-        self.logger.info('Sync with remove obsolete started')
+        self.logger.info("Sync with remove obsolete started")
         self._remove_obsolete_on_sync = True
         self.sync()
 
@@ -362,21 +362,21 @@ class NotionSyncPlugin(QObject):
         """Start sync."""
         if not self._collection_seeded:
             self.logger.warning(
-                'Collection is not seeded yet, trying to seed now'
+                "Collection is not seeded yet, trying to seed now"
             )
             self.seed_collection()
             if not self._collection_seeded:
                 return
         assert self.notion_menu  # mypy
-        self.notion_menu.setTitle('Notion (syncing...)')
+        self.notion_menu.setTitle("Notion (syncing...)")
         for page_conf in self.get_notion_pages_config():
             page_id, target_deck, recursive = page_conf
             worker = NotesExtractorWorker(
-                notion_token=self.config['notion_token'],
+                notion_token=self.config["notion_token"],
                 page_id=page_id,
                 recursive=recursive,
                 target_deck=target_deck,
-                notion_namespace=self.config.get('notion_namespace', ''),
+                notion_namespace=self.config.get("notion_namespace", ""),
                 debug=self.debug,
             )
             worker.signals.result.connect(self.handle_worker_result)
@@ -438,7 +438,7 @@ class NotesExtractorWorker(QRunnable):
         """
         super().__init__()
         self.debug = debug
-        self.logger = get_logger(f'worker_{page_id}', self.debug)
+        self.logger = get_logger(f"worker_{page_id}", self.debug)
         self.signals = NoteExtractorSignals()
         self.notion_token = notion_token
         self.page_id = page_id
@@ -452,7 +452,7 @@ class NotesExtractorWorker(QRunnable):
         Export Notion page as HTML, extract notes data from the HTML and send
         results.
         """
-        self.logger.info('Worker started')
+        self.logger.info("Worker started")
         self.logger.info(
             f"Current page id: {self.page_id}. Current deck: {self.target_deck}"
         )
@@ -460,7 +460,7 @@ class NotesExtractorWorker(QRunnable):
             with TemporaryDirectory() as tmp_dir:
                 # Export given Notion page as HTML
                 tmp_path = safe_path(Path(tmp_dir))
-                export_path = tmp_path / f'{self.page_id}.zip'
+                export_path = tmp_path / f"{self.page_id}.zip"
                 client = NotionClient(self.notion_token, self.debug)
                 client.export_page(
                     page_id=self.page_id,
@@ -468,13 +468,13 @@ class NotesExtractorWorker(QRunnable):
                     recursive=self.recursive,
                 )
                 self.logger.info(
-                    'Exported file downloaded: path=%s', str(export_path)
+                    "Exported file downloaded: path=%s", str(export_path)
                 )
                 # Extract notes data from the HTML files
                 with zipfile.ZipFile(export_path) as zip_file:
                     zip_file.extractall(tmp_path)
                 notes = []
-                for html_path in tmp_path.rglob('*.html'):
+                for html_path in tmp_path.rglob("*.html"):
                     notes += extract_notes_data(
                         source=Path(html_path),
                         notion_namespace=self.notion_namespace,
@@ -484,11 +484,11 @@ class NotesExtractorWorker(QRunnable):
                     f"Notes extracted: deck:{self.target_deck}, count:{len(notes)}"
                 )
         except NotionClientError as exc:
-            self.logger.error('Error extracting notes', exc_info=exc)
-            error_msg = f'Cannot export {self.page_id}:\n{exc}'
+            self.logger.error("Error extracting notes", exc_info=exc)
+            error_msg = f"Cannot export {self.page_id}:\n{exc}"
             self.signals.error.emit(error_msg)
         except OSError as exc:  # Long path
-            self.logger.warning('Error deleting files', exc_info=exc)
+            self.logger.warning("Error deleting files", exc_info=exc)
             # Delete manually
             rmtree(tmp_path, ignore_errors=True)
         else:
