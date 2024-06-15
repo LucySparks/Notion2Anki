@@ -22,13 +22,15 @@ class NotesManager:
     """
 
     #: Note model stylesheet
-    MODEL_CSS: str = (Path(__file__).parent / 'model.css').read_text('utf-8')
+    MODEL_CSS: str = (Path(__file__).parent / "model.css").read_text("utf-8")
     #: Note model name
-    MODEL_NAME: str = 'notion-anki-sync'
+    MODEL_NAME: str = "notion-anki-sync"
     #: Cloze note model name
-    CLOZE_MODEL_NAME: str = 'notion-anki-sync-cloze'
+    CLOZE_MODEL_NAME: str = "notion-anki-sync-cloze"
     #: Card template name
-    CARD_TEMPLATE_NAME: str = 'Question-Answer'
+    CARD_TEMPLATE_NAME: str = "Question-Answer"
+    #: Cloze card template name
+    CLOZE_CARD_TEMPLATE_NAME: str = "Cloze"
     #: Note front side template
     FRONT_TMPL: str = '<div class="front">{{Front}}</div>'
     #: Note back side template
@@ -48,9 +50,7 @@ class NotesManager:
         '<div class="backlink">{{Source}}</div>'
     )
 
-    def __init__(
-        self, collection, deck_name: str, debug: bool = False
-    ) -> None:
+    def __init__(self, collection, deck_name: str, debug: bool = False) -> None:
         """Init syncer.
 
         :param collection: Anki collection
@@ -77,7 +77,7 @@ class NotesManager:
         :param query: query
         :returns: escaped query
         """
-        escaped_query = query.replace('\\', '\\\\').replace('"', '\\"')
+        escaped_query = query.replace("\\", "\\\\").replace('"', '\\"')
         return escaped_query
 
     def create_models(self) -> None:
@@ -91,54 +91,68 @@ class NotesManager:
         if not model:
             model = model_manager.new(self.MODEL_NAME)
             # Add fields
-            for field_name in ('Front', 'Back', 'Source'):
+            for field_name in ("Front", "Back", "Source"):
                 field = model_manager.new_field(field_name)
                 model_manager.add_field(model, field)
             # Add template
             template = model_manager.new_template(self.CARD_TEMPLATE_NAME)
             model_manager.add_template(model, template)
-            self.logger.info('Model created')
+            self.logger.info("Model created")
         # If exists, update template and CSS
         else:
-            template = model['tmpls'][0]
+            template = model["tmpls"][0]
         # Update template
-        template['qfmt'] = self.FRONT_TMPL
-        template['afmt'] = self.BACK_TMPL
+        template["qfmt"] = self.FRONT_TMPL
+        template["afmt"] = self.BACK_TMPL
         # Style model
-        model['css'] = self.MODEL_CSS
+        model["css"] = self.MODEL_CSS
         model_manager.save(model)
-        self.logger.info('Model updated')
-        # Copy cloze model if not exists
+        self.logger.info("Model updated")
+
+        # Create cloze model if not exists
         cloze_model = model_manager.by_name(self.CLOZE_MODEL_NAME)
         if not cloze_model:
-            for model in model_manager.all():
-                if model['type'] == MODEL_CLOZE:
-                    std_cloze_model = model
-                    break
-            else:
-                self.logger.error('Standard cloze model not found')
-                raise NoteManagerException(
-                    'Cannot find a cloze model. Please, add a cloze model '
-                    f'named "{self.CLOZE_MODEL_NAME}" manually'
-                )
-            self.logger.info(f'Copying {std_cloze_model}')
-            cloze_model = model_manager.copy(std_cloze_model)
-            cloze_model['name'] = self.CLOZE_MODEL_NAME
-            # Ensure cloze model fields
-            cloze_model['flds'] = [
-                model_manager.new_field('Front'),
-                model_manager.new_field('Source'),
-            ]
-        # Update cloze template
-        cloze_template = cloze_model['tmpls'][0]
-        cloze_template['qfmt'] = self.CLOZE_FRONT_TMPL
-        cloze_template['afmt'] = self.CLOZE_BACK_TMPL
+            # for model in model_manager.all():
+            #     if model["type"] == MODEL_CLOZE:
+            #         std_cloze_model = model
+            #         break
+            # else:
+            #     self.logger.error("Standard cloze model not found")
+            #     raise NoteManagerException(
+            #         "Cannot find a cloze model. Please, add a cloze model "
+            #         f'named "{self.CLOZE_MODEL_NAME}" manually'
+            #     )
+            # self.logger.info(f"Copying {std_cloze_model}")
+            # cloze_model = model_manager.copy(std_cloze_model)
+            # cloze_model["name"] = self.CLOZE_MODEL_NAME
+            # # Ensure cloze model fields
+            # cloze_model["flds"] = [
+            #     model_manager.new_field("Front"),
+            #     model_manager.new_field("Source"),
+            # ]
+
+            cloze_model = model_manager.new(self.CLOZE_MODEL_NAME)
+            cloze_model["type"] = MODEL_CLOZE
+
+            # Add fields
+            for field_name in ("Front", "Source"):
+                field = model_manager.new_field(field_name)
+                model_manager.add_field(cloze_model, field)
+            # Add template
+            cloze_template = model_manager.new_template(self.CLOZE_CARD_TEMPLATE_NAME)
+            model_manager.add_template(cloze_model, cloze_template)
+            self.logger.info("CLOZE_Model created")
+        # If exists, update template and CSS
+        else:
+            cloze_template = model["tmpls"][0]
         # Style cloze model
-        cloze_model['css'] = self.MODEL_CSS
+        cloze_model["css"] = self.MODEL_CSS
+        # Update cloze template
+        cloze_template["qfmt"] = self.CLOZE_FRONT_TMPL
+        cloze_template["afmt"] = self.CLOZE_BACK_TMPL
+
         model_manager.save(cloze_model)
-        # Pop CSS property for logging
-        cloze_model.pop('css')
-        self.logger.info(f'Cloze model updated: {cloze_model}')
+        self.logger.info("Cloze model updated")
 
     def get_deck(self) -> int:
         """Get or create target deck.
@@ -157,9 +171,9 @@ class NotesManager:
         """
         front = self._escape_query(note.front)
         query = f'deck:"{self.deck_name}" front:"{front}"'
-        self.logger.debug('Searching with a query: %s', safe_str(query))
+        self.logger.debug("Searching with a query: %s", safe_str(query))
         note_ids = self.collection.find_notes(query)
-        self.logger.debug('Result: %s', note_ids)
+        self.logger.debug("Result: %s", note_ids)
         return note_ids[0] if note_ids else None
 
     def _fill_fields(
@@ -173,15 +187,15 @@ class NotesManager:
         :returns: updated data
         """
         updated_data = []
-        for field in model['flds']:
-            field_name = field['name']
+        for field in model["flds"]:
+            field_name = field["name"]
             new_value = getattr(source, field_name.lower())
             existing_value = target[field_name]
             if existing_value != new_value:
                 updated_data.append(
                     {
-                        f'{field}_old': existing_value,
-                        f'{field}_new': new_value,
+                        f"{field}_old": existing_value,
+                        f"{field}_new": new_value,
                     }
                 )
                 target[field_name] = new_value
@@ -208,26 +222,20 @@ class NotesManager:
             # Skip if file already exists
             if media_manager.have(image.filename):
                 continue
-            maybe_new_filename = media_manager.write_data(
-                image.filename, image.data
-            )
-            self.logger.info('Image stored: %s', image.filename)
+            maybe_new_filename = media_manager.write_data(image.filename, image.data)
+            self.logger.info("Image stored: %s", image.filename)
             if maybe_new_filename:
                 self.logger.debug(
-                    'Renaming image %s -> %s',
+                    "Renaming image %s -> %s",
                     image.filename,
                     maybe_new_filename,
                 )
                 if note.back:
-                    note.back = note.back.replace(
-                        image.filename, maybe_new_filename
-                    )
+                    note.back = note.back.replace(image.filename, maybe_new_filename)
         self._fill_fields(anki_note, note, model)
         note_id = anki_note.id
         anki_note.flush()
-        self.logger.info(
-            'Note created: id=%s, front=%s', note_id, safe_str(note.front)
-        )
+        self.logger.info("Note created: id=%s, front=%s", note_id, safe_str(note.front))
         return note_id
 
     def update_note(self, note_id: int, note: AnkiNote) -> bool:
@@ -246,24 +254,24 @@ class NotesManager:
         # Get an existing note
         existing_note = self.collection.get_note(note_id)
         # Ensure note is of right model
-        if existing_note.mid != model['id']:
+        if existing_note.mid != model["id"]:
             self.logger.warning(
-                'Note type changed: note_id=%s, old=%s, new=%s',
+                "Note type changed: note_id=%s, old=%s, new=%s",
                 note_id,
                 existing_note.mid,
-                model['id'],
+                model["id"],
             )
             # It's easier to remove the note and create a new one...
             self.collection.remove_notes([note_id])
             self.create_note(note)
             updated_data.append(
-                {'model_old': existing_note.mid, 'model_new': model['id']}
+                {"model_old": existing_note.mid, "model_new": model["id"]}
             )
         else:
             # Update tags
             if set(existing_note.tags) != set(note.tags):
                 updated_data.append(
-                    {'tags_old': existing_note.tags, 'tags_new': note.tags}
+                    {"tags_old": existing_note.tags, "tags_new": note.tags}
                 )
                 existing_note.tags = note.tags
             # Update field values
@@ -277,29 +285,29 @@ class NotesManager:
                 maybe_new_filename = media_manager.write_data(
                     image.filename, image.data
                 )
-                self.logger.info('Image stored: %s', image.filename)
+                self.logger.info("Image stored: %s", image.filename)
                 if maybe_new_filename:
                     self.logger.debug(
-                        'Renaming image %s -> %s',
+                        "Renaming image %s -> %s",
                         image.filename,
                         maybe_new_filename,
                     )
-                    existing_note['Back'] = existing_note['Back'].replace(
+                    existing_note["Back"] = existing_note["Back"].replace(
                         image.filename, maybe_new_filename
                     )
                     updated_data.append(
                         {
-                            'filename_old': image.filename,
-                            'filename_new': maybe_new_filename,
+                            "filename_old": image.filename,
+                            "filename_new": maybe_new_filename,
                         }
                     )
             if updated_data:
                 existing_note.flush()
                 self.logger.info(
-                    'Note updated: note_id=%s, data=%s', note_id, updated_data
+                    "Note updated: note_id=%s, data=%s", note_id, updated_data
                 )
             else:
-                self.logger.info('No changes in note: note_id=%s', note_id)
+                self.logger.info("No changes in note: note_id=%s", note_id)
         return bool(updated_data)
 
     def remove_notes(self, note_ids: Set[int]) -> None:
@@ -307,5 +315,5 @@ class NotesManager:
 
         :param note_ids: note ids to remove
         """
-        self.logger.info('Removing notes: %s', note_ids)
+        self.logger.info("Removing notes: %s", note_ids)
         self.collection.remove_notes(list(note_ids))
