@@ -46,15 +46,12 @@ class NoteDataExtractor(HTMLParser):
     """Parser to extract Anki note data from HTML.
 
     For each toggle block Notion generates HTML like this:
-    <ul id=<guid> class="toggle">
-        <li>
-            <details open="">
-                <summary>Front side of a note</summary>
-                <p>Back side paragraph 1.</p>
-                <p>Back side paragraph 2.</p>
-            </details>
-        </li>
-    </ul>
+    <details open="">
+        <summary style="...">Toggle title here</summary>
+        <div class="indented">
+            <p id="..." class="">Toggle content here</p>
+        </div>
+    </details>
 
     LaTeX blocks follow MathML notation with a lot of generated HTML tags,
     but parser only cares about <annotation> tag which contains LaTeX code
@@ -369,7 +366,7 @@ def extract_notes_data(
     soup = BeautifulSoup(html_doc, 'html.parser')
     article = soup.find_all('article')[0]
     article_id = article['id'].replace('-', '')
-    for note_node in soup.find_all('ul', 'toggle'):
+    for note_node in soup.find_all('details'):
         note = NoteDataExtractor.extract_note(
             html=str(note_node), base_dir=source.parent, debug=debug
         )
